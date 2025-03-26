@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACH Debit Simulation</title>
+    <style>
+        :root {
+            --primary: #3498db;
+            --secondary: #2ecc71;
+            --warning: #e74c3c;
+            --dark: #34495e;
+            --light: #ecf0f1;
+            --gray: #95a5a6;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: var(--light);
+            color: var(--dark);
+            line-height: 1.6;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: var(--dark);
+            margin-bottom: 10px;
+        }
+        
+        .description {
+            color: var(--gray);
+            max-width: 800px;
+            margin: 0 auto 20px;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+        
+        button:disabled {
+            background-color: var(--gray);
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .reset-btn {
+            background-color: var(--dark);
+        }
+        
+        .nsf-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--gray);
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: var(--warning);
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        
+        .simulation-container {
+            position: relative;
+            height: 500px;
+            border: 2px solid var(--gray);
+            border-radius: 10px;
+            margin-bottom: 30px;
+            overflow: hidden;
+            background-color: #f8f9fa;
+        }
+        
+        .entity {
+            position: absolute;
+            width: 150px;
+            height: 100px;
+            background-color: white;
+            border: 2px solid var(--primary);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 10px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .entity.highlight {
+            box-shadow: 0 0 15px var(--secondary);
+            transform: scale(1.05);
+        }
+        
+        .entity.error {
+            box-shadow: 0 0 15px var(--warning);
+        }
+        
+        .entity h3 {
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        
+        .entity p {
+            font-size: 12px;
+            color: var(--gray);
+        }
+        
+        .originator {
+            top: 50px;
+            left: 50px;
+            border-color: #3498db;
+        }
+        
+        .odfi {
+            top: 50px;
+            left: 300px;
+            border-color: #9b59b6;
+        }
+        
+        .ach-operator {
+            top: 200px;
+            left: 500px;
+            border-color: #f1c40f;
+        }
+        
+        .rdfi {
+            top: 350px;
+            left: 300px;
+            border-color: #e67e22;
+        }
+        
+        .receiver {
+            top: 350px;
+            left: 50px;
+            border-color: #2ecc71;
+        }
+        
+        .message {
+            position: absolute;
+            background-color: white;
+            border-radius: 15px;
+            padding: 10px;
+            font-size: 12px;
+            max-width: 150px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            transition: opacity 0.5s;
+            z-index: 10;
+        }
+        
+        .message.active {
+            opacity: 1;
+        }
+        
+        .arrow {
+            position: absolute;
+            height: 2px;
+            background-color: var(--primary);
+            transform-origin: left center;
+            z-index: 5;
+        }
+        
+        .arrow:after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: -4px;
+            width: 0;
+            height: 0;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            border-left: 10px solid var(--primary);
+        }
+        
+        .arrow.funds {
+            background-color: var(--secondary);
+        }
+        
+        .arrow.funds:after {
+            border-left-color: var(--secondary);
+        }
+        
+        .arrow.return {
+            background-color: var(--warning);
+        }
+        
+        .arrow.return:after {
+            border-left-color: var(--warning);
+        }
+        
+        .timeline {
+            margin-top: 20px;
+            position: relative;
+            height: 80px;
+        }
+        
+        .timeline-bar {
+            position: absolute;
+            top: 30px;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background-color: var(--gray);
+            border-radius: 2px;
+        }
+        
+        .timeline-progress {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background-color: var(--primary);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.5s;
+        }
+        
+        .timeline-marker {
+            position: absolute;
+            top: 20px;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+        
+        .timeline-marker:before {
+            content: '';
+            display: block;
+            width: 2px;
+            height: 10px;
+            background-color: var(--dark);
+            margin: 0 auto 5px;
+        }
+        
+        .timeline-marker span {
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 10px;
+            border-radius: 3px;
+        }
+        
+        .info-panel {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        
+        .info-panel h2 {
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        
+        .info-content {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .day-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: var(--dark);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 768px) {
+            .entity {
+                width: 120px;
+                height: 80px;
+                font-size: 12px;
+            }
+            
+            .originator {
+                top: 30px;
+                left: 30px;
+            }
+            
+            .odfi {
+                top: 30px;
+                left: 220px;
+            }
+            
+            .ach-operator {
+                top: 150px;
+                left: 350px;
+            }
+            
+            .rdfi {
+                top: 270px;
+                left: 220px;
+            }
+            
+            .receiver {
+                top: 270px;
+                left: 30px;
+            }
+            
+            .simulation-container {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ACH Debit Simulation</h1>
+            <p class="description">
+                This simulation demonstrates the flow of information and funds in an ACH debit transaction, 
+                including the timing between different participants in the ACH network.
+            </p>
+        </header>
+        
+        <div class="controls">
+            <button id="start-btn">Start Simulation</button>
+            <button id="reset-btn" class="reset-btn" disabled>Reset</button>
+            <div class="nsf-toggle">
+                <span>Simulate NSF Return:</span>
+                <label class="switch">
+                    <input type="checkbox" id="nsf-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+        
+        <div class="simulation-container">
+            <div class="day-indicator">Day 1</div>
+            
+            <!-- Entities -->
+            <div class="entity originator">
+                <h3>Originator</h3>
+                <p>Business/Merchant</p>
+            </div>
+            
+            <div class="entity odfi">
+                <h3>ODFI</h3>
+                <p>Originating Bank</p>
+            </div>
+            
+            <div class="entity ach-operator">
+                <h3>ACH Operator</h3>
+                <p>Federal Reserve</p>
+            </div>
+            
+            <div class="entity rdfi">
+                <h3>RDFI</h3>
+                <p>Receiving Bank</p>
+            </div>
+            
+            <div class="entity receiver">
+                <h3>Receiver</h3>
+                <p>Customer</p>
+            </div>
+            
+            <!-- Arrows will be added dynamically -->
+            
+            <!-- Messages will be added dynamically -->
+        </div>
+        
+        <div class="timeline">
+            <div class="timeline-bar">
+                <div class="timeline-progress"></div>
+            </div>
+            <div class="timeline-marker" style="left: 0%">
+                <span>Day 1: Initiation</span>
+            </div>
+            <div class="timeline-marker" style="left: 33%">
+                <span>Day 2: Processing</span>
+            </div>
+            <div class="timeline-marker" style="left: 66%">
+                <span>Day 3: Settlement</span>
+            </div>
+            <div class="timeline-marker" style="left: 100%">
+                <span>Day 4: Completion</span>
+            </div>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: var(--primary);"></div>
+                <span>Information Flow</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: var(--secondary);"></div>
+                <span>Funds Movement</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: var(--warning);"></div>
+                <span>Return/NSF</span>
+            </div>
+        </div>
+        
+        <div class="info-panel">
+            <h2>About ACH Debits</h2>
+            <div class="info-content">
+                <p>An ACH debit is an electronic payment where funds are "pulled" from an account. Common examples include utility bills, subscription services, and mortgage payments.</p>
+                <br>
+                <p><strong>Key Participants:</strong></p>
+                <ul>
+                    <li><strong>Originator:</strong> The entity initiating the debit (e.g., a business)</li>
+                    <li><strong>ODFI (Originating Depository Financial Institution):</strong> The originator's bank</li>
+                    <li><strong>ACH Operator:</strong> The central clearing facility (Federal Reserve or The Clearing House)</li>
+                    <li><strong>RDFI (Receiving Depository Financial Institution):</strong> The receiver's bank</li>
+                    <li><strong>Receiver:</strong> The account holder whose account is being debited</li>
+                </ul>
+                <br>
+                <p><strong>Typical Timeline:</strong></p>
+                <ul>
+                    <li><strong>Day 1:</strong> Originator submits debit request to ODFI</li>
+                    <li><strong>Day 2:</strong> ODFI forwards to ACH Operator, which sends to RDFI</li>
+                    <li><strong>Day 3:</strong> Settlement occurs, funds are transferred</li>
+                    <li><strong>Day 4+:</strong> Potential returns (e.g., NSF) can occur within 2 business days</li>
+                </ul>
+            </div>
+        </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                // DOM Elements
+                const startBtn = document.getElementById('start-btn');
+                const resetBtn = document.getElementById('reset-btn');
+                const nsfToggle = document.getElementById('nsf-toggle');
+                const simulationContainer = document.querySelector('.simulation-container');
+                const dayIndicator = document.querySelector('.day-indicator');
+                const timelineProgress = document.querySelector('.timeline-progress');
+                
+                // Entities
+                const originator = document.querySelector('.originator');
+                const odfi = document.querySelector('.odfi');
+                const achOperator = document.querySelector('.ach-operator');
+                const rdfi = document.querySelector('.rdfi');
+                const receiver = document.querySelector('.receiver');
+                
+                // State
+                let isSimulationRunning = false;
+                let simulationStep = 0;
+                let simulationTimers = [];
+                
+                // Entity positions for arrow calculations
+                const positions = {
+                    originator: getEntityCenter(originator),
+                    odfi: getEntityCenter(odfi),
+                    achOperator: getEntityCenter(achOperator),
+                    rdfi: getEntityCenter(rdfi),
+                    receiver: getEntityCenter(receiver)
+                };
+                
+                // Get center position of an entity for arrow positioning
+                function getEntityCenter(element) {
+                    const rect = element.getBoundingClientRect();
+                    const containerRect = simulationContainer.getBoundingClientRect();
+                    
+                    return {
+                        x: rect.left - containerRect.left + rect.width / 2,
+                        y: rect.top - containerRect.top + rect.height / 2
+                    };
+                }
+                
+                // Create an arrow between two entities
+                function createArrow(from, to, type = '') {
+                    const arrow = document.createElement('div');
+                    arrow.className = `arrow ${type}`;
+                    
+                    const dx = to.x - from.x;
+                    const dy = to.y - from.y;
+                    const length = Math.sqrt(dx * dx + dy * dy);
+                    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                    
+                    arrow.style.width = `${length}px`;
+                    arrow.style.left = `${from.x}px`;
+                    arrow.style.top = `${from.y}px`;
+                    arrow.style.transform = `rotate(${angle}deg)`;
+                    
+                    simulationContainer.appendChild(arrow);
+                    return arrow;
+                }
+                
+                // Create a message bubble
+                function createMessage(text, x, y) {
+                    const message = document.createElement('div');
+                    message.className = 'message';
+                    message.textContent = text;
+                    message.style.left = `${x}px`;
+                    message.style.top = `${y}px`;
+                    
+                    simulationContainer.appendChild(message);
+                    
+                    setTimeout(() => {
+                        message.classList.add('active');
+                    }, 100);
+                    
+                    return message;
+                }
+                
+                // Highlight an entity
+                function highlightEntity(entity, isError = false) {
+                    entity.classList.add('highlight');
+                    if (isError) {
+                        entity.classList.add('error');
+                    }
+                    
+                    return () => {
+                        entity.classList.remove('highlight');
+                        if (isError) {
+                            entity.classList.remove('error');
+                        }
+                    };
+                }
+                
+                // Update the day indicator
+                function updateDay(day) {
+                    dayIndicator.textContent = `Day ${day}`;
+                    
+                    // Update timeline progress
+                    const progress = (day - 1) * 33;
+                    timelineProgress.style.width = `${Math.min(progress, 100)}%`;
+                }
+                
+                // Clear all arrows and messages
+                function clearArrowsAndMessages() {
+                    document.querySelectorAll('.arrow, .message').forEach(el => el.remove());
+                }
+                
+                // Simulation steps
+                const simulationSteps = {
+                    // Day 1: Initiation
+                    initiateDebit: function() {
+                        updateDay(1);
+                        
+                        const unhighlight = highlightEntity(originator);
+                        createMessage('Customer authorizes debit for $100', positions.originator.x - 75, positions.originator.y - 70);
+                        
+                        simulationTimers.push(setTimeout(() => {
+                            unhighlight();
+                            const arrow = createArrow(positions.originator, positions.odfi);
+                            createMessage('Sends debit request to bank', (positions.originator.x + positions.odfi.x) / 2 - 75, (positions.originator.y + positions.odfi.y) / 2 - 40);
+                            
+                            simulationTimers.push(setTimeout(() => {
+                                const unhighlightOdfi = highlightEntity(odfi);
+                                createMessage('Validates request and batches with other ACH entries', positions.odfi.x - 75, positions.odfi.y - 70);
+                                
+                                simulationTimers.push(setTimeout(() => {
+                                    unhighlightOdfi();
+                                    simulationStep++;
+                                    simulationSteps.sendToOperator();
+                                }, 3000));
+                            }, 2000));
+                        }, 2000));
+                    },
+                    
+                    // Day 2: Processing
+                    sendToOperator: function() {
+                        updateDay(2);
+                        
+                        const unhighlightOdfi = highlightEntity(odfi);
+                        
+                        simulationTimers.push(setTimeout(() => {
+                            unhighlightOdfi();
+                            const arrow = createArrow(positions.odfi, positions.achOperator);
+                            createMessage('Transmits batch file to ACH Operator', (positions.odfi.x + positions.achOperator.x) / 2 - 75, (positions.odfi.y + positions.achOperator.y) / 2 - 40);
+                            
+                            simulationTimers.push(setTimeout(() => {
+                                const unhighlightOperator = highlightEntity(achOperator);
+                                createMessage('Sorts entries and prepares for distribution', positions.achOperator.x - 75, positions.achOperator.y - 70);
+                                
+                                simulationTimers.push(setTimeout(() => {
+                                    unhighlightOperator();
+                                    const arrow = createArrow(positions.achOperator, positions.rdfi);
+                                    createMessage('Sends debit entry to receiver\'s bank', (positions.achOperator.x + positions.rdfi.x) / 2 - 75, (positions.achOperator.y + positions.rdfi.y) / 2 - 40);
+                                    
+                                    simulationTimers.push(setTimeout(() => {
+                                        const unhighlightRdfi = highlightEntity(rdfi);
+                                        createMessage('Receives and validates debit entry', positions.rdfi.x - 75, positions.rdfi.y - 70);
+                                        
+                                        simulationTimers.push(setTimeout(() => {
+                                            unhighlightRdfi();
+                                            simulationStep++;
+                                            simulationSteps.settlement();
+                                        }, 3000));
+                                    }, 2000));
+                                }, 3000));
+                            }, 2000));
+                        }, 2000));
+                    },
+                    
+                    // Day 3: Settlement
+                    settlement: function() {
+                        updateDay(3);
+                        
+                        const unhighlightRdfi = highlightEntity(rdfi);
+                        
+                        simulationTimers.push(setTimeout(() => {
+                            // Check if NSF is toggled
+                            if (nsfToggle.checked) {
+                                // NSF path
+                                createMessage('Checks balance: Insufficient funds', positions.rdfi.x - 75, positions.rdfi.y - 70);
+                                
+                                simulationTimers.push(setTimeout(() => {
+                                    unhighlightRdfi();
+                                    simulationStep++;
+                                    simulationSteps.nsfReturn();
+                                }, 3000));
+                            } else {
+                                // Normal path
+                                createMessage('Checks balance: Sufficient funds', positions.rdfi.x - 75, positions.rdfi.y - 70);
+                                
+                                simulationTimers.push(setTimeout(() => {
+                                    unhighlightRdfi();
+                                    const arrow = createArrow(positions.rdfi, positions.receiver);
+                                    createMessage('Notifies customer of pending debit', (positions.rdfi.x + positions.receiver.x) / 2 - 75, (positions.rdfi.y + positions.receiver.y) / 2 - 40);
+                                    
+                                    simulationTimers.push(setTimeout(() => {
+                                        const unhighlightReceiver = highlightEntity(receiver);
+                                        createMessage('Account debited $100', positions.receiver.x - 75, positions.receiver.y - 70);
+                                        
+                                        simulationTimers.push(setTimeout(() => {
+                                            unhighlightReceiver();
+                                            
+                                            // Settlement between financial institutions
+                                            const arrowRdfiToAch = createArrow(positions.rdfi, positions.achOperator, 'funds');
+                                            createMessage('Funds sent to ACH Operator', (positions.rdfi.x + positions.achOperator.x) / 2 - 75, (positions.rdfi.y + positions.achOperator.y) / 2 - 40);
+                                            
+                                            simulationTimers.push(setTimeout(() => {
+                                                const arrowAchToOdfi = createArrow(positions.achOperator, positions.odfi, 'funds');
+                                                createMessage('Funds sent to originator\'s bank', (positions.achOperator.x + positions.odfi.x) / 2 - 75, (positions.achOperator.y + positions.odfi.y) / 2 - 40);
+                                                
+                                                simulationTimers.push(setTimeout(() => {
+                                                    const arrowOdfiToOriginator = createArrow(positions.odfi, positions.originator, 'funds');
+                                                    createMessage('Funds credited to originator', (positions.odfi.x + positions.originator.x) / 2 - 75, (positions.odfi.y + positions.originator.y) / 2 - 40);
+                                                    
+                                                    simulationTimers.push(setTimeout(() => {
+                                                        const unhighlightOriginator = highlightEntity(originator);
+                                                        createMessage('Transaction complete', positions.originator.x - 75, positions.originator.y - 70);
+                                                        
+                                                        simulationTimers.push(setTimeout(() => {
+                                                            unhighlightOriginator();
+                                                            updateDay(4);
+                                                            simulationStep++;
+                                                            completeSimulation();
+                                                        }, 3000));
+                                                    }, 2000));
+                                                }, 2000));
+                                            }, 2000));
+                                        }, 3000));
+                                    }, 2000));
+                                }, 2000));
+                            }
+                        }, 2000));
+                    },
+                    
+                    // NSF Return path
+                    nsfReturn: function() {
+                        const unhighlightRdfi = highlightEntity(rdfi, true);
+                        
+                        simulationTimers.push(setTimeout(() => {
+                            unhighlightRdfi();
+                            const arrow = createArrow(positions.rdfi, positions.achOperator, 'return');
+                            createMessage('Returns debit with R01 (NSF) code', (positions.rdfi.x + positions.achOperator.x) / 2 - 75, (positions.rdfi.y + positions.achOperator.y) / 2 - 40);
+                            
+                            simulationTimers.push(setTimeout(() => {
+                                const unhighlightOperator = highlightEntity(achOperator);
+                                
+                                simulationTimers.push(setTimeout(() => {
+                                    unhighlightOperator();
+                                    const arrow = createArrow(positions.achOperator, positions.odfi, 'return');
+                                    createMessage('Forwards return to originator\'s bank', (positions.achOperator.x + positions.odfi.x) / 2 - 75, (positions.achOperator.y + positions.odfi.y) / 2 - 40);
+                                    
+                                    simulationTimers.push(setTimeout(() => {
+                                        const unhighlightOdfi = highlightEntity(odfi, true);
+                                        createMessage('Processes return', positions.odfi.x - 75, positions.odfi.y - 70);
+                                        
+                                        simulationTimers.push(setTimeout(() => {
+                                            unhighlightOdfi();
+                                            const arrow = createArrow(positions.odfi, positions.originator, 'return');
+                                            createMessage('Notifies of failed debit', (positions.odfi.x + positions.originator.x) / 2 - 75, (positions.odfi.y + positions.originator.y) / 2 - 40);
+                                            
+                                            simulationTimers.push(setTimeout(() => {
+                                                const unhighlightOriginator = highlightEntity(originator, true);
+                                                createMessage('Transaction failed: NSF', positions.originator.x - 75, positions.originator.y - 70);
+                                                
+                                                simulationTimers.push(setTimeout(() => {
+                                                    unhighlightOriginator();
+                                                    updateDay(4);
+                                                    simulationStep++;
+                                                    completeSimulation();
+                                                }, 3000));
+                                            }, 2000));
+                                        }, 3000));
+                                    }, 2000));
+                                }, 2000));
+                            }, 2000));
+                        }, 2000));
+                    }
+                };
+                
+                // Complete the simulation
+                function completeSimulation() {
+                    isSimulationRunning = false;
+                    startBtn.disabled = true;
+                    resetBtn.disabled = false;
+                    nsfToggle.disabled = true;
+                }
+                
+                // Start the simulation
+                function startSimulation() {
+                    if (isSimulationRunning) return;
+                    
+                    isSimulationRunning = true;
+                    simulationStep = 0;
+                    startBtn.disabled = true;
+                    resetBtn.disabled = true;
+                    nsfToggle.disabled = true;
+                    
+                    clearArrowsAndMessages();
+                    simulationSteps.initiateDebit();
+                }
+                
+                // Reset the simulation
+                function resetSimulation() {
+                    // Clear all timers
+                    simulationTimers.forEach(timer => clearTimeout(timer));
+                    simulationTimers = [];
+                    
+                    // Reset UI
+                    clearArrowsAndMessages();
+                    updateDay(1);
+                    
+                    // Reset state
+                    isSimulationRunning = false;
+                    simulationStep = 0;
+                    
+                    // Reset controls
+                    startBtn.disabled = false;
+                    resetBtn.disabled = true;
+                    nsfToggle.disabled = false;
+                }
+                
+                // Event listeners
+                startBtn.addEventListener('click', startSimulation);
+                resetBtn.addEventListener('click', resetSimulation);
+                
+                // Handle window resize
+                window.addEventListener('resize', function() {
+                    // Recalculate positions
+                    positions.originator = getEntityCenter(originator);
+                    positions.odfi = getEntityCenter(odfi);
+                    positions.achOperator = getEntityCenter(achOperator);
+                    positions.rdfi = getEntityCenter(rdfi);
+                    positions.receiver = getEntityCenter(receiver);
+                    // If simulation is running, clear and redraw arrows
+                    if (isSimulationRunning) {
+                        clearArrowsAndMessages();
+                        
+                        // Restart from current step
+                        if (simulationStep === 0) {
+                            simulationSteps.initiateDebit();
+                        } else if (simulationStep === 1) {
+                            simulationSteps.sendToOperator();
+                        } else if (simulationStep === 2) {
+                            simulationSteps.settlement();
+                        } else if (simulationStep === 3 && nsfToggle.checked) {
+                            simulationSteps.nsfReturn();
+                        }
+                    }
+                });
+                
+                // Initialize tooltip positions
+                window.addEventListener('load', function() {
+                    // Recalculate positions after everything is loaded
+                    positions.originator = getEntityCenter(originator);
+                    positions.odfi = getEntityCenter(odfi);
+                    positions.achOperator = getEntityCenter(achOperator);
+                    positions.rdfi = getEntityCenter(rdfi);
+                    positions.receiver = getEntityCenter(receiver);
+                });
+            });
+        </script>
+    </div>
+</body>
+</html>
