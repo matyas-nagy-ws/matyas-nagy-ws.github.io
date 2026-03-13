@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Experiment: direct-debit-t3-insuff-exposure</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232733;
+    --border: #2e3345;
+    --text: #e2e4ea;
+    --text-dim: #8b8fa3;
+    --control: #6366f1;
+    --control-bg: rgba(99,102,241,.12);
+    --treatment: #22d3ee;
+    --treatment-bg: rgba(34,211,238,.12);
+    --green: #34d399;
+    --red: #f87171;
+    --amber: #fbbf24;
+    --green-bg: rgba(52,211,153,.12);
+    --red-bg: rgba(248,113,113,.12);
+    --amber-bg: rgba(251,191,36,.12);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding: 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  header {
+    text-align: center;
+    padding: 32px 0 8px;
+  }
+
+  header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -.5px;
+    margin-bottom: 6px;
+  }
+
+  header h1 code {
+    color: var(--treatment);
+    background: var(--treatment-bg);
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-size: 22px;
+  }
+
+  header .subtitle {
+    color: var(--text-dim);
+    font-size: 15px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  .meta-bar {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin: 20px 0 28px;
+    flex-wrap: wrap;
+  }
+
+  .meta-item {
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .meta-item strong {
+    color: var(--text);
+  }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 4px;
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .tab {
+    padding: 8px 20px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-dim);
+    transition: all .2s;
+    border: none;
+    background: none;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    background: var(--surface2);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  }
+
+  /* Sections */
+  .section { display: none; animation: fadeIn .3s; }
+  .section.active { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Explanation callout */
+  .explanation {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+
+  .explanation strong { color: var(--text); }
+  .explanation .hl-control { color: var(--control); font-weight: 600; }
+  .explanation .hl-treatment { color: var(--treatment); font-weight: 600; }
+
+  /* KPI Cards */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    transition: transform .15s, box-shadow .15s;
+  }
+
+  .kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  }
+
+  .kpi-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .kpi-value {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -.5px;
+  }
+
+  .kpi-delta {
+    font-size: 13px;
+    margin-top: 6px;
+    font-weight: 600;
+  }
+
+  .delta-up { color: var(--green); }
+  .delta-down { color: var(--red); }
+  .delta-neutral { color: var(--amber); }
+
+  /* Comparison rows */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .compare-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+
+  .compare-card h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .compare-card h3 .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .dot-control { background: var(--control); }
+  .dot-treatment { background: var(--treatment); }
+
+  /* Chart containers */
+  .chart-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .chart-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+
+  .chart-box.full {
+    grid-column: 1 / -1;
+  }
+
+  .chart-box h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .chart-box .chart-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+  }
+
+  /* Data table */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .data-table th {
+    text-align: left;
+    padding: 10px 12px;
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .data-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .data-table tr:last-child td { border-bottom: none; }
+
+  .data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .data-table .highlight-row { background: rgba(99,102,241,.05); }
+
+  /* Flow diagram */
+  .flow-diagram {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin: 24px 0;
+    flex-wrap: wrap;
+  }
+
+  .flow-node {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    text-align: center;
+    min-width: 150px;
+  }
+
+  .flow-node .flow-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+
+  .flow-node .flow-value {
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .flow-arrow {
+    font-size: 24px;
+    color: var(--text-dim);
+    padding: 0 8px;
+  }
+
+  .variant-label {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  .variant-label.control { background: var(--control-bg); color: var(--control); }
+  .variant-label.treatment { background: var(--treatment-bg); color: var(--treatment); }
+
+  /* Sankey-like bar comparison */
+  .bar-compare {
+    margin: 16px 0;
+  }
+
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .bar-label {
+    width: 80px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .bar-track {
+    flex: 1;
+    height: 32px;
+    background: var(--surface2);
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    position: relative;
+  }
+
+  .bar-segment {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    transition: width .6s ease;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .seg-instant { background: rgba(99,102,241,.7); }
+  .seg-nsf { background: rgba(34,211,238,.7); }
+  .seg-t1 { background: rgba(251,191,36,.5); }
+
+  .bar-total {
+    width: 100px;
+    font-size: 12px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Tooltip custom styles for chart.js handled by chart config */
+
+  /* Responsive */
+  @media (max-width: 800px) {
+    .chart-row, .compare-grid { grid-template-columns: 1fr; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .meta-bar { gap: 16px; }
+    body { padding: 12px; }
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-bottom: 20px;
+    font-size: 13px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  /* Insight callout */
+  .insight {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: var(--green-bg);
+    border: 1px solid rgba(52,211,153,.2);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .insight.warn {
+    background: var(--amber-bg);
+    border-color: rgba(251,191,36,.2);
+  }
+
+  .insight.bad {
+    background: var(--red-bg);
+    border-color: rgba(248,113,113,.2);
+  }
+
+  .insight-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+    line-height: 1.4;
+  }
+
+  /* Waterfall */
+  .waterfall-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .waterfall-label {
+    width: 180px;
+    text-align: right;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .waterfall-bar-track {
+    flex: 1;
+    height: 28px;
+    position: relative;
+  }
+
+  .waterfall-bar {
+    position: absolute;
+    height: 100%;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .waterfall-value {
+    width: 100px;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Experiment: <code>direct-debit-t3-insuff-exposure</code></h1>
+  <p class="subtitle">Slowing down high-exposure ACH payments instead of blocking them. Did allowing more payments through increase losses?</p>
+</header>
+
+<div class="meta-bar">
+  <div class="meta-item"><strong>Period:</strong> Mar 28 &ndash; Aug 18, 2025</div>
+  <div class="meta-item"><strong>Control (V0):</strong> 67,839 users</div>
+  <div class="meta-item"><strong>Treatment (V1):</strong> 67,740 users</div>
+  <div class="meta-item"><strong>Status:</strong> Archived</div>
+</div>
+
+<div class="tabs" id="tabs">
+  <button class="tab active" data-tab="overview">Overview</button>
+  <button class="tab" data-tab="volume">Volume Impact</button>
+  <button class="tab" data-tab="speed">Payment Speed</button>
+  <button class="tab" data-tab="chargebacks">Chargebacks</button>
+  <button class="tab" data-tab="losses">Losses &amp; Recovery</button>
+  <button class="tab" data-tab="details">Detailed Data</button>
+</div>
+
+<!-- ===== OVERVIEW ===== -->
+<div class="section active" id="sec-overview">
+
+  <div class="explanation">
+    <strong>How this experiment worked:</strong>
+    When a customer's outstanding exposure (money Wise hasn't yet received from the bank) exceeded a threshold,
+    the <span class="hl-control">Control</span> group had payments <strong>blocked</strong> entirely via usability preconditions.
+    The <span class="hl-treatment">Treatment</span> group instead had payments <strong>slowed down</strong> to NSF_SAFE speed (wait for bank settlement before sending payout),
+    allowing the transfer to proceed while mitigating risk.
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Additional Payments</div>
+      <div class="kpi-value" style="color:var(--green)">+26,890</div>
+      <div class="kpi-delta delta-up">+2.6% more transfers</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Additional Volume</div>
+      <div class="kpi-value" style="color:var(--green)">+$43.6M</div>
+      <div class="kpi-delta delta-up">+3.6% more $ volume</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Additional Chargebacks</div>
+      <div class="kpi-value" style="color:var(--amber)">+499</div>
+      <div class="kpi-delta delta-neutral">+10.4% more CBs</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Additional Net Loss</div>
+      <div class="kpi-value" style="color:var(--green)">+$27K</div>
+      <div class="kpi-delta delta-up">Only +1.9% more loss</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Loss Rate / Volume</div>
+      <div class="kpi-value" style="color:var(--green)">-1.6%</div>
+      <div class="kpi-delta delta-up">11.44 &rarr; 11.26 bps</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Recovery Rate</div>
+      <div class="kpi-value" style="color:var(--green)">+3.3pp</div>
+      <div class="kpi-delta delta-up">67.3% &rarr; 70.6%</div>
+    </div>
+  </div>
+
+  <div class="insight">
+    <span class="insight-icon">&#9989;</span>
+    <div><strong>Key takeaway:</strong> The treatment successfully unlocked +$43.6M in payment volume while keeping net losses nearly flat (+$27K / +1.9%). The loss rate per dollar of volume actually <em>decreased</em> by 1.6%, driven by a 3.3pp improvement in recovery rate on slowed payments.</div>
+  </div>
+
+  <div class="chart-box full" style="margin-top: 16px;">
+    <h3>Experiment Mechanism: Block vs Slow</h3>
+    <p class="chart-desc">Monthly count of payment attempts blocked (ACCOUNT_EXPOSURE) vs slowed (EXPOSURE_SLOW_PAYMENT) by variant</p>
+    <div class="chart-wrap"><canvas id="chartMechanism"></canvas></div>
+  </div>
+</div>
+
+<!-- ===== VOLUME ===== -->
+<div class="section" id="sec-volume">
+
+  <div class="explanation">
+    In the <span class="hl-control">Control</span>, ~199K payment attempts were <strong>blocked</strong> at the precondition stage.
+    In the <span class="hl-treatment">Treatment</span>, only ~5K were blocked &mdash; the rest were allowed through as slowed payments.
+    This resulted in <strong>26,890 more completed transfers</strong> and <strong>$43.6M more volume</strong>.
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Control &mdash; Payments</div>
+      <div class="kpi-value" style="color:var(--control)">1,026,985</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Treatment &mdash; Payments</div>
+      <div class="kpi-value" style="color:var(--treatment)">1,053,875</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Control &mdash; Blocked</div>
+      <div class="kpi-value" style="color:var(--red)">199,361</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Treatment &mdash; Blocked</div>
+      <div class="kpi-value" style="color:var(--green)">5,115</div>
+      <div class="kpi-delta delta-up">-97.4%</div>
+    </div>
+  </div>
+
+  <div class="chart-row">
+    <div class="chart-box">
+      <h3>Monthly Payment Volume ($)</h3>
+      <p class="chart-desc">Total ACH payment volume by variant per month</p>
+      <div class="chart-wrap"><canvas id="chartVolume"></canvas></div>
+    </div>
+    <div class="chart-box">
+      <h3>Monthly Payment Count</h3>
+      <p class="chart-desc">Number of ACH transfers by variant per month</p>
+      <div class="chart-wrap"><canvas id="chartCount"></canvas></div>
+    </div>
+  </div>
+
+  <div class="insight">
+    <span class="insight-icon">&#128200;</span>
+    <div>The treatment group consistently processed more payments each month. The biggest absolute differences were in the May&ndash;July period when the experiment was fully ramped. The lift came from formerly-blocked high-exposure payments now proceeding as NSF_SAFE.</div>
+  </div>
+</div>
+
+<!-- ===== SPEED ===== -->
+<div class="section" id="sec-speed">
+
+  <div class="explanation">
+    The experiment shifted the payment speed mix. Payments that would have been <strong>blocked</strong> were instead routed as <strong>NSF_SAFE</strong> (wait for bank settlement).
+    This means more payments are slower but fewer are prevented entirely.
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(99,102,241,.7)"></div> INSTANT</div>
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(34,211,238,.7)"></div> NSF_SAFE</div>
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(251,191,36,.5)"></div> T1</div>
+  </div>
+
+  <div class="bar-compare">
+    <div class="bar-row">
+      <div class="bar-label" style="color:var(--control)">Control</div>
+      <div class="bar-track">
+        <div class="bar-segment seg-instant" style="width:90.93%">90.9% Instant</div>
+        <div class="bar-segment seg-nsf" style="width:8.55%">8.6%</div>
+        <div class="bar-segment seg-t1" style="width:0.52%"></div>
+      </div>
+      <div class="bar-total">1,026,985</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label" style="color:var(--treatment)">Treatment</div>
+      <div class="bar-track">
+        <div class="bar-segment seg-instant" style="width:83.81%">83.8% Instant</div>
+        <div class="bar-segment seg-nsf" style="width:15.74%">15.7% NSF_SAFE</div>
+        <div class="bar-segment seg-t1" style="width:0.44%"></div>
+      </div>
+      <div class="bar-total">1,053,875</div>
+    </div>
+  </div>
+
+  <div class="chart-row">
+    <div class="chart-box">
+      <h3>Speed Distribution &mdash; Control</h3>
+      <p class="chart-desc">Breakdown of payment speeds in the control group</p>
+      <div class="chart-wrap"><canvas id="chartSpeedControl"></canvas></div>
+    </div>
+    <div class="chart-box">
+      <h3>Speed Distribution &mdash; Treatment</h3>
+      <p class="chart-desc">Breakdown of payment speeds in the treatment group</p>
+      <div class="chart-wrap"><canvas id="chartSpeedTreatment"></canvas></div>
+    </div>
+  </div>
+
+  <div class="chart-box full">
+    <h3>Monthly NSF_SAFE Payment Count</h3>
+    <p class="chart-desc">The treatment nearly doubled NSF_SAFE payments every month</p>
+    <div class="chart-wrap"><canvas id="chartNsfMonthly"></canvas></div>
+  </div>
+
+  <div class="insight warn">
+    <span class="insight-icon">&#9888;&#65039;</span>
+    <div>The NSF_SAFE share nearly doubled (8.6% &rarr; 15.7%). This means more customers experienced slower payments. However, these customers would have been <em>completely blocked</em> in the control &mdash; a slower payment is better than no payment.</div>
+  </div>
+</div>
+
+<!-- ===== CHARGEBACKS ===== -->
+<div class="section" id="sec-chargebacks">
+
+  <div class="explanation">
+    Chargebacks increased by <strong>+10.4%</strong> in absolute count, but when normalized by payment volume the rate only increased by <strong>+7.6%</strong>.
+    Most of the increase came from R01 (Insufficient Funds) and 901 return codes, which is expected since these are the payments that were previously blocked.
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Control &mdash; Chargebacks</div>
+      <div class="kpi-value" style="color:var(--control)">4,799</div>
+      <div class="kpi-delta" style="color:var(--text-dim)">46.7 per 10K pmts</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Treatment &mdash; Chargebacks</div>
+      <div class="kpi-value" style="color:var(--treatment)">5,298</div>
+      <div class="kpi-delta" style="color:var(--text-dim)">50.3 per 10K pmts</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Control &mdash; Users w/ CB</div>
+      <div class="kpi-value" style="color:var(--control)">3,194</div>
+      <div class="kpi-delta" style="color:var(--text-dim)">4.7% of users</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Treatment &mdash; Users w/ CB</div>
+      <div class="kpi-value" style="color:var(--treatment)">3,410</div>
+      <div class="kpi-delta" style="color:var(--text-dim)">5.0% of users</div>
+    </div>
+  </div>
+
+  <div class="chart-row">
+    <div class="chart-box">
+      <h3>Monthly Chargeback Count</h3>
+      <p class="chart-desc">Total chargebacks per month by variant</p>
+      <div class="chart-wrap"><canvas id="chartCbMonthly"></canvas></div>
+    </div>
+    <div class="chart-box">
+      <h3>Top Chargeback Return Codes</h3>
+      <p class="chart-desc">Count by return code (top 8)</p>
+      <div class="chart-wrap"><canvas id="chartReturnCodes"></canvas></div>
+    </div>
+  </div>
+
+  <div class="chart-box full">
+    <h3>Chargeback Rate by Payment Speed</h3>
+    <p class="chart-desc">CB rate per 10K payments, broken down by DELAY_TYPE and variant</p>
+    <div class="chart-wrap"><canvas id="chartCbBySpeed"></canvas></div>
+  </div>
+
+  <div class="insight">
+    <span class="insight-icon">&#128161;</span>
+    <div><strong>Critical insight:</strong> The NSF_SAFE chargeback rate in the treatment (213.5/10K) is <strong>42% lower</strong> than in the control (369/10K). In the control, only the highest-risk payments are NSF_SAFE. In the treatment, the pool is diluted with moderate-risk payments (formerly blocked), bringing down the average rate.</div>
+  </div>
+</div>
+
+<!-- ===== LOSSES ===== -->
+<div class="section" id="sec-losses">
+
+  <div class="explanation">
+    The bottom line: despite more chargebacks, net losses after recovery increased by only <strong>+$27K (+1.9%)</strong>.
+    The recovery rate improved from <strong>67.3% to 70.6%</strong> because NSF_SAFE payments settle before payout,
+    making it easier to recover funds when a chargeback occurs.
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Control &mdash; CB Amount</div>
+      <div class="kpi-value" style="color:var(--control)">$4.24M</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Treatment &mdash; CB Amount</div>
+      <div class="kpi-value" style="color:var(--treatment)">$4.81M</div>
+      <div class="kpi-delta delta-neutral">+13.6%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Control &mdash; Net Loss</div>
+      <div class="kpi-value" style="color:var(--control)">$1.39M</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Treatment &mdash; Net Loss</div>
+      <div class="kpi-value" style="color:var(--treatment)">$1.41M</div>
+      <div class="kpi-delta delta-up">Only +$27K</div>
+    </div>
+  </div>
+
+  <div class="chart-row">
+    <div class="chart-box">
+      <h3>Monthly Net Loss After Recovery</h3>
+      <p class="chart-desc">Loss remaining after all recovery efforts</p>
+      <div class="chart-wrap"><canvas id="chartLossMonthly"></canvas></div>
+    </div>
+    <div class="chart-box">
+      <h3>Monthly Recovery Rate</h3>
+      <p class="chart-desc">% of chargeback amount recovered each month</p>
+      <div class="chart-wrap"><canvas id="chartRecoveryMonthly"></canvas></div>
+    </div>
+  </div>
+
+  <div class="chart-box full">
+    <h3>Loss Waterfall: Control vs Treatment</h3>
+    <p class="chart-desc">How chargeback amounts flow to recovery and net loss</p>
+    <div style="padding: 24px 0;">
+      <div style="margin-bottom: 24px;">
+        <div style="font-size: 13px; font-weight: 600; color: var(--control); margin-bottom: 12px;">CONTROL (V0)</div>
+        <div class="waterfall-row">
+          <div class="waterfall-label">CB Amount</div>
+          <div class="waterfall-bar-track"><div class="waterfall-bar" style="left:0;width:100%;background:rgba(99,102,241,.5);">$4.24M</div></div>
+          <div class="waterfall-value">$4,235,944</div>
+        </div>
+        <div class="waterfall-row">
+          <div class="waterfall-label">Recovered</div>
+          <div class="waterfall-bar-track"><div class="waterfall-bar" style="left:0;width:67.3%;background:var(--green);">$2.85M (67.3%)</div></div>
+          <div class="waterfall-value" style="color:var(--green)">$2,849,059</div>
+        </div>
+        <div class="waterfall-row">
+          <div class="waterfall-label">Net Loss</div>
+          <div class="waterfall-bar-track"><div class="waterfall-bar" style="left:0;width:32.7%;background:var(--red);">$1.39M</div></div>
+          <div class="waterfall-value" style="color:var(--red)">$1,386,885</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size: 13px; font-weight: 600; color: var(--treatment); margin-bottom: 12px;">TREATMENT (V1)</div>
+        <div class="waterfall-row">
+          <div class="waterfall-label">CB Amount</div>
+          <div class="waterfall-bar-track"><div class="waterfall-bar" style="left:0;width:100%;background:rgba(34,211,238,.5);">$4.81M</div></div>
+          <div class="waterfall-value">$4,810,585</div>
+        </div>
+        <div class="waterfall-row">
+          <div class="waterfall-label">Recovered</div>
+          <div class="waterfall-bar-track"><div class="waterfall-bar" style="left:0;width:70.6%;background:var(--green);">$3.40M (70.6%)</div></div>
+          <div class="waterfall-value" style="color:var(--green)">$3,396,679</div>
+        </div>
+        <div class="waterfall-row">
+          <div class="waterfall-label">Net Loss</div>
+          <div class="waterfall-bar-track"><div class="waterfall-bar" style="left:0;width:29.4%;background:var(--red);">$1.41M</div></div>
+          <div class="waterfall-value" style="color:var(--red)">$1,413,905</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="insight">
+    <span class="insight-icon">&#9989;</span>
+    <div><strong>Why recovery improved:</strong> NSF_SAFE payments wait for bank settlement before Wise sends the payout. This means when a chargeback happens, the funds are still within Wise's control. The 3.3pp recovery rate improvement (+$547K more recovered) almost entirely offset the +$575K increase in CB amount, leaving only +$27K in additional net loss.</div>
+  </div>
+</div>
+
+<!-- ===== DETAILS ===== -->
+<div class="section" id="sec-details">
+
+  <div class="explanation">
+    Raw data tables for all key metrics. All numbers are for the experiment period (Mar 28 &ndash; Aug 18, 2025).
+  </div>
+
+  <div class="chart-box full" style="margin-bottom:16px">
+    <h3>Summary Comparison</h3>
+    <table class="data-table">
+      <thead>
+        <tr><th>Metric</th><th class="num">Control (V0)</th><th class="num">Treatment (V1)</th><th class="num">Delta</th><th class="num">Delta %</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Total Users</td><td class="num">67,839</td><td class="num">67,740</td><td class="num">-99</td><td class="num">-0.1%</td></tr>
+        <tr><td>Users with Payments</td><td class="num">67,743</td><td class="num">67,683</td><td class="num">-60</td><td class="num">-0.1%</td></tr>
+        <tr class="highlight-row"><td>Total Payments</td><td class="num">1,026,985</td><td class="num">1,053,875</td><td class="num" style="color:var(--green)">+26,890</td><td class="num" style="color:var(--green)">+2.6%</td></tr>
+        <tr class="highlight-row"><td>Total Volume ($)</td><td class="num">$1,212,609,952</td><td class="num">$1,256,245,082</td><td class="num" style="color:var(--green)">+$43,635,129</td><td class="num" style="color:var(--green)">+3.6%</td></tr>
+        <tr><td>INSTANT Payments</td><td class="num">936,691</td><td class="num">886,092</td><td class="num" style="color:var(--red)">-50,599</td><td class="num">-5.4%</td></tr>
+        <tr><td>NSF_SAFE Payments</td><td class="num">88,294</td><td class="num">166,633</td><td class="num" style="color:var(--treatment)">+78,339</td><td class="num">+88.7%</td></tr>
+        <tr><td>Blocked (ACCOUNT_EXPOSURE)</td><td class="num">199,361</td><td class="num">5,115</td><td class="num" style="color:var(--green)">-194,246</td><td class="num" style="color:var(--green)">-97.4%</td></tr>
+        <tr><td>Slowed (EXPOSURE_SLOW_PAYMENT)</td><td class="num">2</td><td class="num">3,144</td><td class="num" style="color:var(--treatment)">+3,142</td><td class="num">-</td></tr>
+        <tr><td colspan="5" style="border:none;padding:4px"></td></tr>
+        <tr><td>Users with Chargebacks</td><td class="num">3,194</td><td class="num">3,410</td><td class="num">+216</td><td class="num">+6.8%</td></tr>
+        <tr class="highlight-row"><td>Total Chargebacks</td><td class="num">4,799</td><td class="num">5,298</td><td class="num" style="color:var(--amber)">+499</td><td class="num" style="color:var(--amber)">+10.4%</td></tr>
+        <tr><td>CB Amount ($)</td><td class="num">$4,235,944</td><td class="num">$4,810,585</td><td class="num">+$574,641</td><td class="num">+13.6%</td></tr>
+        <tr><td>Recovered ($)</td><td class="num">$2,849,059</td><td class="num">$3,396,679</td><td class="num" style="color:var(--green)">+$547,620</td><td class="num" style="color:var(--green)">+19.2%</td></tr>
+        <tr class="highlight-row"><td>Net Loss After Recovery ($)</td><td class="num">$1,386,885</td><td class="num">$1,413,905</td><td class="num" style="color:var(--amber)">+$27,021</td><td class="num" style="color:var(--green)">+1.9%</td></tr>
+        <tr><td>Recovery Rate</td><td class="num">67.3%</td><td class="num">70.6%</td><td class="num" style="color:var(--green)">+3.3pp</td><td class="num" style="color:var(--green)">-</td></tr>
+        <tr><td colspan="5" style="border:none;padding:4px"></td></tr>
+        <tr><td>CB Rate / 10K Payments</td><td class="num">46.73</td><td class="num">50.27</td><td class="num">+3.54</td><td class="num">+7.6%</td></tr>
+        <tr class="highlight-row"><td>Loss Rate / 10K$ Volume (bps)</td><td class="num">11.44</td><td class="num">11.26</td><td class="num" style="color:var(--green)">-0.18</td><td class="num" style="color:var(--green)">-1.6%</td></tr>
+        <tr><td>NSF CB Rate / 10K Payments</td><td class="num">27.07</td><td class="num">28.80</td><td class="num">+1.73</td><td class="num">+6.4%</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="chart-box full" style="margin-bottom:16px">
+    <h3>Chargeback Rate by Payment Speed</h3>
+    <table class="data-table">
+      <thead>
+        <tr><th>Variant</th><th>Delay Type</th><th class="num">Payments</th><th class="num">Chargebacks</th><th class="num">CB Rate /10K</th><th class="num">CB Amount</th><th class="num">Loss</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="variant-label control">Control</span></td><td>INSTANT</td><td class="num">936,690</td><td class="num">4,683</td><td class="num">50.0</td><td class="num">$3,750,973</td><td class="num">$1,108,762</td></tr>
+        <tr><td><span class="variant-label control">Control</span></td><td>NSF_SAFE</td><td class="num">88,096</td><td class="num">3,251</td><td class="num" style="color:var(--red)">369.0</td><td class="num">$2,987,996</td><td class="num">$753,599</td></tr>
+        <tr><td><span class="variant-label treatment">Treatment</span></td><td>INSTANT</td><td class="num">886,089</td><td class="num">5,103</td><td class="num">57.6</td><td class="num">$4,122,531</td><td class="num">$1,131,707</td></tr>
+        <tr class="highlight-row"><td><span class="variant-label treatment">Treatment</span></td><td>NSF_SAFE</td><td class="num">166,386</td><td class="num">3,553</td><td class="num" style="color:var(--green)">213.5</td><td class="num">$3,328,004</td><td class="num">$812,245</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="chart-box full">
+    <h3>Top Return Codes (NSF_SAFE payments only)</h3>
+    <table class="data-table">
+      <thead>
+        <tr><th>Variant</th><th>Return Code</th><th class="num">Count</th><th class="num">CB Amount</th><th class="num">Loss</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="variant-label control">Control</span></td><td>R01 (NSF)</td><td class="num">2,194</td><td class="num">$1,935,893</td><td class="num">$285,121</td></tr>
+        <tr><td><span class="variant-label control">Control</span></td><td>901</td><td class="num">701</td><td class="num">$511,532</td><td class="num">$139,978</td></tr>
+        <tr><td><span class="variant-label control">Control</span></td><td>908</td><td class="num">125</td><td class="num">$135,213</td><td class="num">$67,151</td></tr>
+        <tr><td colspan="5" style="border:none;padding:2px"></td></tr>
+        <tr><td><span class="variant-label treatment">Treatment</span></td><td>R01 (NSF)</td><td class="num">2,380</td><td class="num">$2,134,300</td><td class="num">$406,625</td></tr>
+        <tr><td><span class="variant-label treatment">Treatment</span></td><td>901</td><td class="num">784</td><td class="num">$636,517</td><td class="num">$175,212</td></tr>
+        <tr><td><span class="variant-label treatment">Treatment</span></td><td>908</td><td class="num">90</td><td class="num">$186,040</td><td class="num">$76,409</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// Tab switching
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('sec-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// Chart.js defaults
+Chart.defaults.color = '#8b8fa3';
+Chart.defaults.borderColor = '#2e3345';
+Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.plugins.legend.labels.usePointStyle = true;
+Chart.defaults.plugins.legend.labels.pointStyle = 'circle';
+Chart.defaults.plugins.legend.labels.padding = 16;
+
+const CONTROL = '#6366f1';
+const TREATMENT = '#22d3ee';
+const CONTROL_BG = 'rgba(99,102,241,.15)';
+const TREATMENT_BG = 'rgba(34,211,238,.15)';
+
+const months = ['Mar*', 'Apr', 'May', 'Jun', 'Jul', 'Aug*'];
+
+// ---------- OVERVIEW: Mechanism chart ----------
+new Chart(document.getElementById('chartMechanism'), {
+  type: 'bar',
+  data: {
+    labels: months,
+    datasets: [
+      { label: 'Control - Blocked', data: [4574, 49074, 43122, 36821, 39696, 26076], backgroundColor: 'rgba(248,113,113,.6)', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.65 },
+      { label: 'Treatment - Blocked', data: [407, 1113, 789, 565, 762, 1479], backgroundColor: 'rgba(248,113,113,.25)', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.65 },
+      { label: 'Treatment - Slowed', data: [109, 841, 592, 446, 544, 612], backgroundColor: 'rgba(34,211,238,.6)', borderRadius: 4, barPercentage: 0.7, categoryPercentage: 0.65 },
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toLocaleString() } }
+    },
+    scales: {
+      y: { beginAtZero: true, grid: { color: '#2e3345' }, ticks: { callback: v => v >= 1000 ? (v/1000)+'K' : v } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+// ---------- VOLUME: Monthly volume ----------
+const v0vol = [30233857, 244666794, 209752438, 161323636, 162985366, 86018900];
+const v1vol = [28956767, 222236580, 192624078, 152471955, 153177034, 80079991];
+// add nsf_safe volumes
+const v0volTotal = [30233857+2395956, 244666794+25684717, 209752438+55162435, 161323636+72653820, 162985366+80145128, 86018900+39556913];
+const v1volTotal = [28956767+5938476, 222236580+66456003, 192624078+79957672, 152471955+90616337, 153177034+97117676, 80079991+48849048];
+
+new Chart(document.getElementById('chartVolume'), {
+  type: 'bar',
+  data: {
+    labels: months,
+    datasets: [
+      { label: 'Control', data: v0volTotal, backgroundColor: CONTROL_BG, borderColor: CONTROL, borderWidth: 1.5, borderRadius: 4, barPercentage: 0.7 },
+      { label: 'Treatment', data: v1volTotal, backgroundColor: TREATMENT_BG, borderColor: TREATMENT, borderWidth: 1.5, borderRadius: 4, barPercentage: 0.7 },
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      y: { beginAtZero: true, grid: { color: '#2e3345' }, ticks: { callback: v => '$'+(v/1e6).toFixed(0)+'M' } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+// Payment count
+const v0cnt = [27174+1080, 209381+8327, 206887+21451, 188589+21785, 192807+24703, 111852+10789];
+const v1cnt = [26780+3006, 197356+27139, 195229+38999, 179138+37593, 181441+40018, 106145+19704];
+
+new Chart(document.getElementById('chartCount'), {
+  type: 'line',
+  data: {
+    labels: months,
+    datasets: [
+      { label: 'Control', data: v0cnt, borderColor: CONTROL, backgroundColor: CONTROL_BG, fill: true, tension: .3, pointRadius: 4 },
+      { label: 'Treatment', data: v1cnt, borderColor: TREATMENT, backgroundColor: TREATMENT_BG, fill: true, tension: .3, pointRadius: 4 },
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      y: { beginAtZero: false, grid: { color: '#2e3345' }, ticks: { callback: v => (v/1000).toFixed(0)+'K' } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+// ---------- SPEED: Doughnuts ----------
+const speedOpts = (title) => ({
+  responsive: true,
+  plugins: {
+    legend: { position: 'bottom' },
+    tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed.toLocaleString() + ' (' + ((ctx.parsed / ctx.dataset.data.reduce((a,b)=>a+b,0))*100).toFixed(1) + '%)' } }
+  }
+});
+
+new Chart(document.getElementById('chartSpeedControl'), {
+  type: 'doughnut',
+  data: {
+    labels: ['INSTANT', 'NSF_SAFE', 'T1', 'T0'],
+    datasets: [{ data: [936690, 88096, 5266, 89], backgroundColor: ['rgba(99,102,241,.7)', 'rgba(34,211,238,.7)', 'rgba(251,191,36,.5)', 'rgba(139,143,163,.3)'], borderWidth: 0 }]
+  },
+  options: { ...speedOpts('Control'), cutout: '55%' }
+});
+
+new Chart(document.getElementById('chartSpeedTreatment'), {
+  type: 'doughnut',
+  data: {
+    labels: ['INSTANT', 'NSF_SAFE', 'T1', 'T0'],
+    datasets: [{ data: [886089, 166386, 4637, 170], backgroundColor: ['rgba(99,102,241,.7)', 'rgba(34,211,238,.7)', 'rgba(251,191,36,.5)', 'rgba(139,143,163,.3)'], borderWidth: 0 }]
+  },
+  options: { ...speedOpts('Treatment'), cutout: '55%' }
+});
+
+// NSF Monthly
+new Chart(document.getElementById('chartNsfMonthly'), {
+  type: 'bar',
+  data: {
+    labels: months,
+    datasets: [
+      { label: 'Control NSF_SAFE', data: [1080, 8327, 21451, 21785, 24703, 10789], backgroundColor: CONTROL_BG, borderColor: CONTROL, borderWidth: 1.5, borderRadius: 4, barPercentage: .6 },
+      { label: 'Treatment NSF_SAFE', data: [3006, 27139, 38999, 37593, 40018, 19704], backgroundColor: TREATMENT_BG, borderColor: TREATMENT, borderWidth: 1.5, borderRadius: 4, barPercentage: .6 },
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      y: { beginAtZero: true, grid: { color: '#2e3345' }, ticks: { callback: v => (v/1000).toFixed(0)+'K' } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+// ---------- CHARGEBACKS ----------
+new Chart(document.getElementById('chartCbMonthly'), {
+  type: 'line',
+  data: {
+    labels: months,
+    datasets: [
+      { label: 'Control', data: [126, 1229, 959, 734, 843, 908], borderColor: CONTROL, backgroundColor: CONTROL_BG, fill: true, tension: .3, pointRadius: 5 },
+      { label: 'Treatment', data: [176, 1339, 1064, 767, 1022, 930], borderColor: TREATMENT, backgroundColor: TREATMENT_BG, fill: true, tension: .3, pointRadius: 5 },
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      y: { beginAtZero: true, grid: { color: '#2e3345' } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+// Return codes
+new Chart(document.getElementById('chartReturnCodes'), {
+  type: 'bar',
+  data: {
+    labels: ['R01', '901', '908', 'R10', 'R16', 'R08', 'R11', '915'],
+    datasets: [
+      { label: 'Control', data: [2780, 910, 200, 126, 120, 95, 86, 26], backgroundColor: CONTROL, borderRadius: 4, barPercentage: .7 },
+      { label: 'Treatment', data: [3035, 1025, 157, 186, 191, 86, 64, 56], backgroundColor: TREATMENT, borderRadius: 4, barPercentage: .7 },
+    ]
+  },
+  options: {
+    responsive: true,
+    indexAxis: 'y',
+    scales: {
+      x: { beginAtZero: true, grid: { color: '#2e3345' } },
+      y: { grid: { display: false } }
+    }
+  }
+});
+
+// CB rate by speed
+new Chart(document.getElementById('chartCbBySpeed'), {
+  type: 'bar',
+  data: {
+    labels: ['INSTANT', 'NSF_SAFE'],
+    datasets: [
+      { label: 'Control', data: [50.0, 369.0], backgroundColor: CONTROL_BG, borderColor: CONTROL, borderWidth: 2, borderRadius: 6, barPercentage: .5 },
+      { label: 'Treatment', data: [57.6, 213.5], backgroundColor: TREATMENT_BG, borderColor: TREATMENT, borderWidth: 2, borderRadius: 6, barPercentage: .5 },
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + ' per 10K' } }
+    },
+    scales: {
+      y: { beginAtZero: true, grid: { color: '#2e3345' }, title: { display: true, text: 'CB Rate per 10K Payments', color: '#8b8fa3' } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+// ---------- LOSSES ----------
+new Chart(document.getElementById('chartLossMonthly'), {
+  type: 'bar',
+  data: {
+    labels: months,
+    datasets: [
+      { label: 'Control', data: [12034, 302752, 301589, 203453, 344107, 222951], backgroundColor: CONTROL_BG, borderColor: CONTROL, borderWidth: 1.5, borderRadius: 4, barPercentage: .6 },
+      { label: 'Treatment', data: [30696, 489664, 216420, 177634, 349729, 149762], backgroundColor: TREATMENT_BG, borderColor: TREATMENT, borderWidth: 1.5, borderRadius: 4, barPercentage: .6 },
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      y: { beginAtZero: true, grid: { color: '#2e3345' }, ticks: { callback: v => '$'+(v/1000).toFixed(0)+'K' } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+// Recovery rate monthly
+const v0rec = [69333.52/81367.25*100, 822704.87/1125456.45*100, 672861/974449.95*100, 451911.73/655364.52*100, 536712.74/880819.73*100, 295535.35/518486.13*100];
+const v1rec = [104117.46/134813.49*100, 867441.37/1357105.29*100, 857610.21/1074030.54*100, 586690.34/764324.50*100, 625812.08/975541.18*100, 355007.90/504769.85*100];
+
+new Chart(document.getElementById('chartRecoveryMonthly'), {
+  type: 'line',
+  data: {
+    labels: months,
+    datasets: [
+      { label: 'Control', data: v0rec, borderColor: CONTROL, backgroundColor: CONTROL_BG, fill: false, tension: .3, pointRadius: 5 },
+      { label: 'Treatment', data: v1rec, borderColor: TREATMENT, backgroundColor: TREATMENT_BG, fill: false, tension: .3, pointRadius: 5 },
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      y: { beginAtZero: false, min: 40, max: 100, grid: { color: '#2e3345' }, ticks: { callback: v => v.toFixed(0)+'%' } },
+      x: { grid: { display: false } }
+    },
+    plugins: {
+      tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + '%' } }
+    }
+  }
+});
+</script>
+
+</body>
+</html>
